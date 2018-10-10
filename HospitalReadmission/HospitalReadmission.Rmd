@@ -1,0 +1,371 @@
+---
+title: "STAT 571 - Miniproject"
+author: "Vishal Murali"
+date: "April 7, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Part 1: Executive Summary:
+
+In this section, my goal is to provide background of the study,  quick summary about the data and present the methods I used to analyse the data, and my results and findings.
+
+## (A) . Background:
+
+Diabetes is a chronic medical condition affecting millions of Americans, but if managed well, with good diet, exercise and medication, patients can lead relatively normal lives. However, if improperly managed, diabetes can lead to patients being continuously admitted and readmitted to hospitals. Readmissions are especially serious - they represent a failure of the health system to provide adequate support to the patient and are extremely costly to the system. As a result, the Centers for Medicare and Medicaid Services announced in 2012 that they would no longer reimburse hospitals for services rendered if a patient was readmitted with complications within 30 days of discharge.
+Given these policy changes, being able to identify and predict those patients most at risk for costly readmissions has become a pressing priority for hospital administrators.
+In this project, we shall explore how to use the techniques we have learned in order to help better manage diabetes patients who have been admitted to a hospital. Our goal is to avoid patients being readmitted within 30 days of discharge, which reduces costs for the hospital and improves outcomes for patients.
+The original data is from the Center for Clinical and Translational Research at Virginia Commonwealth University. It covers data on diabetes patients across 130 U.S. hospitals from 1999 to 2008. There are over 100,000 unique hospital admissions in this dataset, from ~70,000 unique patients. The data includes demographic elements, such as age, gender, and race, as well as clinical attributes such as tests conducted, emergency/inpatient visits, etc
+
+## (B). Summary of the data
+
+Our dataset consists of 101766 instances of  31 features.
+
+Description of variables:
+
+   The dataset used covers ~50 different variables to describe every hospital diabetes admission. In this section we give an overview and brief description of the variables in this dataset.
+
+a) Patient identi???ers:
+
+a. encounter_id: unique identifier for each admission b. patient_nbr: unique identi???er for each patient
+
+b) Patient Demographics:
+race, age, gender, weight cover the basic demographic information associated with each patient. Payer_code
+is an additional variable that identifies which health insurance (Medicare /Medicaid / Commercial) the patient holds.
+
+c) Admission and discharge details:
+
+a. admission_source_id and admission_type_id identify who referred the patient to the hospital (e.g. physician vs. emergency dept.) and what type of admission this was (Emergency vs. Elective vs. Urgent). 
+
+b. discharge_disposition_id indicates where the patient was discharged to after treatment.
+
+d) Patient Medical History:
+
+a. num_outpatient: number of outpatient visits by the patient in the year prior to the current encounter 
+
+b. num_inpatient: number of inpatient visits by the patient in the year prior to the current encounter 
+
+c. num_emergency: number of emergency visits by the patient in the year prior to the current encounter
+
+e) Patient admission details:
+
+a. medical_specialty: the specialty of the physician admitting the patient 
+
+b. diag_1, diag_2, diag_3: ICD9 codes for the primary, secondary and tertiary diagnoses of the patient. ICD9 are the universal codes that all physicians use to record diagnoses. There are various easy to use tools to lookup what individual codes mean (Wikipedia is pretty decent on its own) 
+
+c. time_in_hospital: the patient's length of stay in the hospital (in days) 
+
+d. number_diagnoses: Total no. of diagnosis entered for the patient 
+
+e. num_lab_procedures: No. of lab procedures performed in the current encounter 
+
+f. num_procedures: No. of non-lab procedures performed in the current encounter g. num_medications: No. of distinct medications prescribed in the current encounter
+
+f) Clinical Results:
+
+a. max_glu_serum: indicates results of the glucose serum test 
+
+b. A1Cresult: indicates results of the A1c test
+
+g) Medication Details:
+
+a. diabetesMed: indicates if any diabetes medication was prescribed 
+
+b. change: indicates if there was a change in diabetes medication 
+
+c. 24 medication variables: indicate whether the dosage of the medicines was changed in any manner during the encounter
+
+h) Readmission indicator:
+Indicates whether a patient was readmitted after a particular admission. There are 3 levels for this variable: "NO" = no readmission, "< 30" = readmission within 30 days and "> 30" = readmission after more than 30 days. The 30 day distinction is of practical importance to hospitals because federal regulations penalize hospitals for an excessive proportion of such readmissions.
+
+## (C). Analysis of the data:
+  
+  To analyse the data, I first created a 70/30 training/testing split. I then started out with a simple EDA(Exploratory Data Analysis) of the data so see the distribution of various features. It became immediately obvious that certain features such as glimepiride, metformin, diag2_mod, diag3_mod etc. are are unlikely to be predictive of readmission due to low variability. I then   performed cross validation to identify features that have non zero coefficients. I used this subset of features and fit a Logistic Regression Model on the training data, and studied the performance . I then fit the models oon the testing data to see how these models generalize to unseen data.
+The Logistic Regression model performed reasonably well on the testing set, yielding an AUC value of 0.63, and a specificity of 0.47.
+
+## (D). Limitations of the Analysis:
+
+The most important limitation in this study is that Diabetic encounters are not all encounters of diabetes patients, but rather only these where diabetes was coded as an existing health condition. Thus we are working with only a fraction of the total number of patients with diabetes.
+
+# Part 2: Detailed process of the Analysis:
+
+## Step 1: Data Summary 
+
+Looking at the data:
+
+```{r cars}
+rm(list=ls()) # Remove all the existing variables
+data <- read.csv("readmission.csv")
+str(data)
+```
+
+Getting a quick data summary:
+
+
+```{r}
+summary(data)
+```
+
+Refactoring the target variable to have only 0s and 1s.
+```{r, message=FALSE, warning=FALSE}
+
+library(ggplot2)
+require("car")    
+
+data$readmitted <- ifelse(data$readmitted == "<30", "Yes","No") 
+```
+
+Creating Training and Testing sets.
+```{r, message=FALSE, warning=FALSE}
+library(caret)
+Train <- createDataPartition(data$readmitted, p=0.7, list=FALSE)
+training <- data[ Train, ]
+testing <- data[ -Train, ]
+```
+## Step 2: Analysis(EDA, Feature Selection, Fitting Models and Evalutaing models on testing data):
+
+Let's do some simple EDA. We'll begin by exploring the distribution by readmission.
+```{r, fig.height=3, fig.width=5, message=FALSE, warning=FALSE}
+ggplot(data = data) + 
+  geom_bar(aes(x = readmitted , fill = readmitted)) + 
+  theme_bw()
+  labs(list(title="Distribution by Readmission", x = "0 or 1", y = "Count"))
+```
+It is interesting to note that only ~ 10% of the patients get readmitted.
+
+Next we'll examine some variables that seem to have low variability
+```{r}
+require(gridExtra)
+plot1 <- ggplot(data = data) + 
+  geom_bar(aes(x = glimepiride, fill = readmitted)) + 
+  labs(list(title="Distribution by glimepiride", x = "0 or 1", y = "Count"))
+plot2 <- ggplot(data = data) + 
+  geom_bar(aes(x = glipizide, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by glipizide", x = "0 or 1", y = "Count"))
+plot3 <- ggplot(data = data) + 
+  geom_bar(aes(x = metformin, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by metformin", x = "0 or 1", y = "Count"))
+plot4 <- ggplot(data = data) + 
+  geom_bar(aes(x = glyburide, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by glyburide", x = "0 or 1", y = "Count"))
+plot5 <- ggplot(data = data) + 
+  geom_bar(aes(x = diag2_mod, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by diag2_mod", x = "0 or 1", y = "Count"))
+plot6 <- ggplot(data = data) + 
+  geom_bar(aes(x = diag3_mod, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by diag3_mod", x = "0 or 1", y = "Count"))
+
+grid.arrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol=2)
+```
+
+As we can see in the plots above, these variables are unlikely to be stastically significant as they have low variability. We can take tese variables out of the data.
+
+### Cross Validation and Fitting Models on Data:
+
+I then run cross validation with the cv.glmnet package to identify the most statistically significant variables, and fit a logistic regression model on the data(See Appendix for details).
+I then made predictions on the testing data.
+
+## Step 3: Summary and Conclusions:
+
+My final model contained the following features: race, gender, time_in_hospital, num_lab_procedures, num_procedures, num_medications , number_outpatient , number_emergency , number_inpatient , number_diagnoses, max_glu_serum, disch_disp_modified, adm_src_mod, age_mod and diag1_mod.
+
+The performance statistics of the Logistic Regression Model on the testing set are as follows:
+
+Confusion Matrix and Statistics
+
+          Reference
+Prediction     0     1
+         0 27068    54
+         1  3359    48
+                                          
+               Accuracy : 0.8882          
+                 95% CI : (0.8846, 0.8917)
+    No Information Rate : 0.9967          
+    P-Value [Acc > NIR] : 1               
+                                          
+                  Kappa : 0.021           
+ Mcnemar's Test P-Value : <2e-16          
+                                          
+            Sensitivity : 0.88960         
+            Specificity : 0.47059         
+         Pos Pred Value : 0.99801         
+         Neg Pred Value : 0.01409         
+             Prevalence : 0.99666         
+         Detection Rate : 0.88663         
+   Detection Prevalence : 0.88840         
+      Balanced Accuracy : 0.68010
+(See full model and summary in Appendix)
+ 
+ For the random forest model, I choose the features that have highest predictive power, and plot it to see the performance. (Check Appendix )
+
+
+# Appendix
+                                                                           
+In this section I present the full R code for my analysis in the rmd format.
+
+##Data Summary 
+
+```{r }
+rm(list=ls()) # Remove all the existing variables
+data <- read.csv("readmission.csv")
+str(data)
+```
+
+```{r}
+summary(data)
+```
+
+```{r}
+head(data)
+```
+
+Refactoring the target variable to have only 0s and 1s.
+
+```{r, message=FALSE, warning=FALSE}
+
+library(ggplot2)
+require("car")    
+
+data$readmitted <- ifelse(data$readmitted == "<30", "Yes","No") 
+```
+Creating Training and Testing sets.
+
+```{r, message=FALSE, warning=FALSE}
+library(caret)
+Train <- createDataPartition(data$readmitted, p=0.7, list=FALSE)
+training <- data[ Train, ]
+testing <- data[ -Train, ]
+```
+
+## Exploratory Data Analysis
+
+Let's do some simple EDA. We'll begin by exploring the distribution by readmission.
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = readmitted , fill = readmitted)) + 
+  theme_bw()
+  labs(list(title="Distribution by Readmission", x = "0 or 1", y = "Count"))
+```
+It is interesting to note that only ~ 10% of the patients get readmitted.
+
+Next we'll examine some variables that seem to have low variability
+```{r}
+library(ggplot2)
+ggplot(data = data) + 
+  geom_bar(aes(x = glimepiride, fill = readmitted)) + 
+  labs(list(title="Distribution by glimepiride", x = "0 or 1", y = "Count"))
+```
+
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = glipizide, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by glipizide", x = "0 or 1", y = "Count"))
+```
+
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = metformin, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by metformin", x = "0 or 1", y = "Count"))
+```
+
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = glyburide, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by glyburide", x = "0 or 1", y = "Count"))
+```
+
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = rosiglitazone, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by rosiglitazone", x = "0 or 1", y = "Count"))
+
+```
+
+
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = diag2_mod, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by diag2_mod", x = "0 or 1", y = "Count"))
+```
+
+```{r}
+ggplot(data = data) + 
+  geom_bar(aes(x = diag3_mod, fill = readmitted)) + 
+  theme_bw() +
+  labs(list(title="Distribution by diag3_mod", x = "0 or 1", y = "Count"))
+```
+
+## Feature Selection, fitting models on data
+
+ Deleting some variables
+Let's remove the variables that are unlikely to be predictive of readmission
+```{r}
+
+training = subset(training, select = -c(patient_nbr, encounter_id,
+                            metformin, glimepiride, glipizide, glyburide, rosiglitazone,diag2_mod, diag3_mod))
+testing = subset(testing, select = -c(patient_nbr, encounter_id,
+                                metformin, glimepiride, glipizide, glyburide, rosiglitazone, diag2_mod, diag3_mod) )
+ 
+```
+```{r}
+training$readmitted <- ifelse(training$readmitted == "Yes", 1,0) 
+testing$readmitted <- ifelse(testing$readmitted == "Yes", 1,0) 
+```
+
+Now lets run cross validation with glmnet to identify important 
+
+```{r}
+library(glmnet)
+y_col <- training$readmitted
+x_col <- model.matrix(readmitted ~. , training)
+
+
+
+fit_glm <- cv.glmnet(x_col, as.numeric(y_col),  alpha = 1)
+plot(fit_glm, main = "CMV vs Lambda in LASSO")
+```
+```{r}
+coefs_1se = coef(fit_glm, s="lambda.1se")
+rownames(coefs_1se)[which((coefs_1se) != 0)]
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+library(randomForest)
+rf_formula <- formula(readmitted ~ number_inpatient + number_diagnoses + disch_disp_modified + time_in_hospital + diabetesMed + diag1_mod + num_medications +number_emergency + insulin )
+
+fit.rf <- randomForest(rf_formula, data = training, ntree = 100)
+plot(fit.rf)
+
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+fit2 <- glm(readmitted~., data = training, family = binomial())
+summary(fit2)
+```
+
+## Evaluating Models on Testing Data
+
+The Random forest package uses bagging, so the plot fucntion gives a good idea of how the model performs on unseen data. However, for logistic regression, we have to make sure that the model performs well on testing data.
+
+```{r}
+library(caret)
+predictions <- predict(fit2, testing,  type="response")
+predictions <- ifelse(predictions>0.5, 1, 0)
+confusionMatrix(testing$readmitted, predictions)
+```
+
