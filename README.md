@@ -6,3 +6,5 @@ This repository is a collection of various data science related projects that I 
 
 2. HospitalReadmission - Predicting probability of hospital readmission for diabetes patients.
 (https://archive.ics.uci.edu/ml/datasets/diabetes+130-us+hospitals+for+years+1999-2008#)
+
+3. Using k-means clustering for Image Segmentation.
